@@ -1,7 +1,7 @@
 # SISOP-3-2026-IT-072
 # I Made Gyanendra Anand Wisnawa // 5027251072
 
-## Soal 1 - The Wired Chat
+## Soal 1
 
 ### Deskripsi Soal 1
 
@@ -607,7 +607,7 @@ Terdapat banyak kendala saat pengerjaan soal, yang paling banyak masalahnya yait
 
 ---
 
-## Soal 2 - Eternal Arena
+## Soal 2
 
 ### Deskripsi Soal 2
 
