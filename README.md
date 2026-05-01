@@ -2427,7 +2427,7 @@ make clear_ipc
 1. Pilih `Register` untuk membuat akun baru
 2. Login dengan akun yang sudah dibuat
 3. Di menu utama, pilih `Matchmaking` untuk mencari lawan
-4. Saat battle: tekan `a` untuk Attack, `u` untuk Ultimate, `q` untuk menyerah
+4. Saat battle: tekan `a` untuk Attack, `u` untuk Ultimate
 5. Setelah battle, XP dan gold diberikan sebagai reward
 
 ### Screenshot Soal 2
