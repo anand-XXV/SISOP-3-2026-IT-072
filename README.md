@@ -49,10 +49,10 @@ void write_log(const char *who, const char *msg) {
 **Registrasi nama & autentikasi admin** – Saat client pertama kali connect, server meminta nama. Jika nama yang dimasukkan adalah `"The Knights"`, server meminta password admin. Jika cocok dengan `ADMIN_PASSWORD`, client mendapat hak admin dan bisa mengakses console khusus.
 
 Fitur console admin:
-Pilihan `1` : Melihat jumlah user aktif (`RPC_GET_USERS`)
-Pilihan `2` : Melihat uptime server (`RPC_GET_UPTIME`)
-Pilihan `3` : Emergency shutdown (broadcast ke semua lalu `exit`)
-Pilihan `4` : Disconnect admin
+- Pilihan `1` : Melihat jumlah user aktif (`RPC_GET_USERS`)
+- Pilihan `2` : Melihat uptime server (`RPC_GET_UPTIME`)
+- Pilihan `3` : Emergency shutdown (broadcast ke semua lalu `exit`)
+- Pilihan `4` : Disconnect admin
 
 **`handle_shutdown()`** – Signal handler untuk `SIGINT`/`SIGTERM`. Broadcast pesan shutdown ke semua client sebelum menutup server.
 
