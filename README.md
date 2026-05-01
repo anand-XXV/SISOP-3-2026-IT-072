@@ -76,8 +76,8 @@ select(maxfd + 1, &readfds, NULL, NULL, NULL);
 
 **`handle_sigint()`** – Mengirim perintah `/exit` ke server saat user menekan `Ctrl+C` sebelum disconnect.
 
-### Edge Case & Error Handling Soal 1
- 
+### Edge Case & Error Handling
+
 #### Server (`wired.c`)
  
 **1. Server penuh (MAX_CLIENTS = 32)**
@@ -829,7 +829,7 @@ void send_to_server(const char *cmd) {
 
 **Komunikasi server → client** menggunakan PID client sebagai `mtype`, sehingga setiap client hanya menerima pesan yang ditujukan untuknya.
 
-### Edge Case & Error Handling Soal 2
+### Edge Case & Error Handling
  
 #### Client (`eternal.c`)
  
