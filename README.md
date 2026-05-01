@@ -76,6 +76,104 @@ select(maxfd + 1, &readfds, NULL, NULL, NULL);
 
 **`handle_sigint()`** – Mengirim perintah `/exit` ke server saat user menekan `Ctrl+C` sebelum disconnect.
 
+### Edge Case & Error Handling Soal 1
+ 
+#### Server (`wired.c`)
+ 
+**1. Server penuh (MAX_CLIENTS = 32)**
+Jika semua slot di array `clients[MAX_CLIENTS]` sudah terisi, client baru yang mencoba connect langsung mendapat pesan `[System] Server is full.` dan socket-nya langsung ditutup (`close(new_fd)`). Server tidak crash dan tetap melayani client yang sudah terhubung.
+```
+if (!added) {
+    char *full = "[System] Server is full.\n";
+    send(new_fd, full, strlen(full), 0);
+    close(new_fd);
+}
+```
+ 
+**2. Nama duplikat**
+Sebelum menyimpan nama client, server memanggil `name_taken()` yang mengiterasi seluruh slot. Jika nama sudah dipakai, server mengirim peringatan dan meminta nama lagi — tanpa memutus koneksi.
+```
+if (name_taken(buf)) {
+    char warn[BUF_SIZE];
+    snprintf(warn, sizeof(warn),
+        "[System] The identity '%s' is already synchronized in The Wired.\nEnter your name: ", buf);
+    send(fd, warn, strlen(warn), 0);
+    continue; // tidak disconnect, ulangi input nama
+}
+```
+ 
+**3. Client disconnect tiba-tiba (tanpa `/exit`)**
+Saat `recv()` mengembalikan nilai `<= 0` (koneksi putus dari sisi client, misal terminal ditutup paksa), server langsung memanggil `remove_client()` yang: (a) broadcast notifikasi disconnect ke semua user lain, (b) menutup fd, (c) mengosongkan slot, (d) mencatat ke `history.log`. FD juga dikeluarkan dari `master_set` agar tidak di-poll lagi.
+```
+if (nbytes <= 0) {
+    FD_CLR(fd, &master_set);
+    remove_client(fd);
+    continue;
+}
+```
+ 
+**4. Password admin salah**
+Jika nama client adalah `"The Knights"` tapi password yang dimasukkan tidak cocok, server langsung memutus koneksi client tersebut. State sementara `"__pending_admin__"` digunakan sebagai penanda bahwa client sedang dalam proses autentikasi.
+```
+if (strcmp(buf, ADMIN_PASSWORD) != 0) {
+    send(fd, "[System] Wrong password. Disconnecting.\n", 40, 0);
+    FD_CLR(fd, &master_set);
+    remove_client(fd);
+}
+```
+ 
+**5. Port sudah dipakai (address reuse)**
+Menggunakan `SO_REUSEADDR` agar server bisa langsung bind ulang ke port yang sama setelah restart, tanpa harus menunggu timeout `TIME_WAIT` dari OS.
+```
+int opt = 1;
+setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+```
+ 
+**6. Race condition admin shutdown vs user disconnect**
+Saat admin menjalankan Emergency Shutdown (pilihan `3`), server melakukan `sleep(1)` sebelum `exit(0)` agar semua pesan shutdown sempat terkirim ke client. Signal handler `handle_shutdown()` yang dipasang untuk `SIGINT`/`SIGTERM` juga melakukan hal yang sama.
+ 
+**7. Nama terlalu panjang**
+Buffer nama dibatasi secara eksplisit:
+```
+buf[63] = '\0'; // potong di 63 karakter sebelum disimpan
+```
+Ini mencegah buffer overflow ke struct `Client.name[64]`.
+ 
+**8. Logging gagal buka file**
+Fungsi `write_log()` melakukan pengecekan sebelum menulis. Jika `history.log` tidak bisa dibuka (misalnya permission issue), fungsi langsung return tanpa crash.
+```
+FILE *f = fopen("history.log", "a");
+if (!f) return; // tidak crash, hanya skip logging
+```
+ 
+#### Client (`navi.c`)
+ 
+**9. Koneksi ke server gagal**
+Jika `connect()` gagal (server belum jalan atau IP/port salah), client langsung keluar dengan pesan error dari `perror("connect")`. Tidak ada retry loop — sesuai desain soal.
+ 
+**10. Race condition double disconnect** 
+Masalah utama yang sempat jadi kendala: ketika user menekan `/exit` dan sekaligus receive thread mendeteksi koneksi putus, bisa terjadi dua kali pesan "Disconnecting". Ini diselesaikan dengan atomic compare-and-swap: 
+```
+void do_disconnect() {
+    // hanya bisa masuk sekali: jika disconnecting sudah 1, langsung return
+    if (!__sync_bool_compare_and_swap(&disconnecting, 0, 1)) return;
+    // ...
+}
+```
+Dengan ini, hanya satu thread yang bisa "menang" dan menjalankan proses disconnect.
+ 
+**11. Wake up `select()` dari thread lain**
+`select()` di main thread bersifat blocking. Ketika receive thread mendeteksi server putus, tidak bisa langsung menghentikan main thread. Solusinya: pipe `pipe_fd[2]` digunakan sebagai "sinyal". Receive thread menulis `"x"` ke `pipe_fd[1]`, sehingga `pipe_fd[0]` yang di-monitor oleh `select()` menjadi readable, dan main thread keluar dari blocking state. 
+```
+write(pipe_fd[1], "x", 1); // wake up select() di main thread
+```
+ 
+**12. Input kosong diabaikan**
+Agar tidak mengirim pesan kosong ke server:
+```
+if (strlen(buf) == 0) continue;
+```
+
 ### Full Code Setiap File Soal 1
 #### protocol.h
 ```
@@ -730,6 +828,167 @@ void send_to_server(const char *cmd) {
 ```
 
 **Komunikasi server → client** menggunakan PID client sebagai `mtype`, sehingga setiap client hanya menerima pesan yang ditujukan untuknya.
+
+### Edge Case & Error Handling Soal 2
+ 
+#### Client (`eternal.c`)
+ 
+**1. Orion belum berjalan**
+Saat `eternal` dijalankan, hal pertama yang dilakukan adalah mencoba terhubung ke message queue server via `msgget(MQ_KEY, 0666)`. Jika server belum jalan (IPC belum dibuat), `msgget` akan gagal dan client langsung keluar dengan pesan yang jelas.
+```
+mq_id = msgget(MQ_KEY, 0666);
+if (mq_id < 0) {
+    printf("  Orion are you there?\n");
+    exit(1);
+}
+```
+Perhatikan bahwa flag yang digunakan adalah `0666` tanpa `IPC_CREAT` — artinya client hanya bisa join ke IPC yang sudah ada, bukan membuat sendiri.
+ 
+**2. Respons error dari server ditampilkan ke user**
+Semua respons yang diawali `"ERR:"` ditangani secara seragam di sisi client. Error message dari server langsung ditampilkan ke terminal.
+```
+} else if (strncmp(buf, "ERR:", 4) == 0) {
+    printf("  %s\n", buf + 4);
+}
+```
+Contoh: jika username duplikat saat register → `ERR:Username already exists.` → ditampilkan sebagai `Username already exists.`
+ 
+**3. Pembelian senjata dengan weapon index tidak valid**
+Saat user memasukkan pilihan armory di luar range 1-5:
+```
+if (choice < 1 || choice > MAX_WEAPONS) {
+    printf("  Pilihan tidak valid.\n");
+}
+```
+Validasi ini ada di sisi client sebagai defense pertama, sebelum command dikirim ke server.
+ 
+**4. Terminal mode restore setelah battle**
+Saat battle, terminal diubah ke raw mode (tanpa buffering, tanpa echo) agar input `a`/`u`/`q` bisa ditangkap langsung. Jika battle selesai atau program diinterrupt, `restore_mode()` dipanggil untuk mengembalikan terminal ke kondisi normal — mencegah terminal "rusak" setelah program selesai.
+ 
+**5. HP tidak bisa di bawah nol**
+Baik saat battle vs player maupun vs bot, HP diklem ke minimum 0:
+```
+if (bot_hp < 0) bot_hp = 0;
+// dan
+if (my_hp < 0) my_hp = 0;
+```
+ 
+**6. SIGINT (Ctrl+C) saat battle atau di menu**
+Signal handler `handle_exit()` dipasang di awal `main()`. Ketika Ctrl+C ditekan, handler akan: (a) kirim command `LOGOUT` ke server, (b) restore terminal mode, (c) keluar dengan bersih — memastikan status player di shared memory kembali ke OFFLINE.
+ 
+#### Server (`orion.c`)
+ 
+**7. Username duplikat saat register**
+Sebelum membuat slot player baru, server mengecek seluruh shared memory via `find_player()`. Jika username sudah ada, langsung kirim error tanpa mengubah data.
+```
+if (find_player(username) != -1) {
+    sem_unlock();
+    send_msg(pid, "ERR:Username already exists.");
+    return;
+}
+```
+ 
+**8. Shared memory penuh**
+Jika `find_empty_slot()` tidak menemukan slot kosong (semua 32 slot terpakai), server menolak registrasi.
+```
+int slot = find_empty_slot();
+if (slot == -1) {
+    sem_unlock();
+    send_msg(pid, "ERR:Server penuh.");
+    return;
+}
+```
+ 
+**9. Login ganda pada satu akun**
+Server mengecek `status != STATUS_OFFLINE` sebelum mengizinkan login. Jika akun sedang dipakai (ONLINE, MATCHMAKING, atau BATTLE), login dari session lain ditolak.
+```
+if (p->status != STATUS_OFFLINE) {
+    sem_unlock();
+    send_msg(pid, "ERR:Account is already in use.");
+    return;
+}
+```
+ 
+**10. Password salah saat login**
+Server membandingkan password yang disimpan di shared memory dengan yang dikirim client. Jika tidak cocok, dikirim error tanpa mengubah status player.
+```
+if (strcmp(p->password, password) != 0) {
+    sem_unlock();
+    send_msg(pid, "ERR:Wrong password.");
+    return;
+}
+```
+ 
+**11. Matchmaking tidak menemukan lawan → lawan bot**
+Setelah `MATCHMAKING_TIME` (35 detik) tanpa menemukan player lain yang juga matchmaking, server mengatur status player ke `STATUS_BATTLE` dengan `opponent_idx = -1` (penanda bot) dan mengirim `MATCH:BOT` ke client.
+```
+shm->players[my_idx].status = STATUS_BATTLE;
+shm->players[my_idx].opponent_idx = -1; // -1 = lawan bot
+send_msg(pid, "MATCH:BOT");
+```
+ 
+**12. Player yang sedang battle tidak bisa dijadikan lawan matchmaking**
+Dalam loop matchmaking, server hanya mempertimbangkan player dengan status `STATUS_MATCHMAKING`. Player dengan status `STATUS_BATTLE` atau `STATUS_ONLINE` otomatis tidak terdeteksi.
+```
+if (shm->players[i].status == STATUS_MATCHMAKING) {
+    // pasangkan sebagai lawan
+}
+```
+ 
+**13. Race condition matchmaking dengan semaphore**
+Skenario masalah: dua client bisa saja saling menemukan satu sama lain secara bersamaan (thread A menemukan thread B, thread B menemukan thread A), lalu keduanya coba memasangkan dirinya. Ini dicegah dengan semaphore yang dikunci (`sem_lock()`) selama proses pencocokan. Setelah dipasangkan oleh satu thread, thread lain akan melihat status sudah `STATUS_BATTLE` dan berhenti.
+```
+sem_lock();
+if (shm->players[my_idx].status == STATUS_BATTLE) {
+    sem_unlock();
+    return NULL; // sudah dipasangkan oleh thread lain
+}
+sem_unlock();
+```
+ 
+**14. Gold tidak cukup beli senjata**
+Sebelum mengurangi gold, server memvalidasi saldo:
+```
+if (p->gold < w->price) {
+    sem_unlock();
+    send_msg(pid, "ERR:Gold tidak cukup.");
+    return;
+}
+```
+ 
+**15. Senjata otomatis menggunakan bonus damage terbesar**
+Jika player membeli senjata yang bonus damage-nya lebih kecil dari yang sudah dimiliki, server tidak mengganti weapon aktif:
+```
+if (w->bonus_dmg > p->weapon_bonus_dmg) {
+    p->weapon_bonus_dmg = w->bonus_dmg;
+    strncpy(p->weapon_name, w->name, 31);
+}
+```
+ 
+**16. Match history terbatas 50 entri**
+Jika `history_count` sudah mencapai `MAX_HISTORY (50)`, entri baru tidak disimpan. Ini mencegah overflow di struct `Player`.
+```
+if (me->history_count < MAX_HISTORY) {
+    // simpan history
+    me->history_count++;
+}
+```
+ 
+**17. Cleanup IPC saat server dimatikan**
+Signal handler `cleanup()` untuk `SIGINT`/`SIGTERM` memastikan semua resource IPC dibersihkan sebelum proses berakhir, sehingga tidak ada "IPC zombie" yang tertinggal di sistem.
+```
+void cleanup(int sig) {
+    shmdt(shm);
+    shmctl(shm_id, IPC_RMID, NULL);
+    msgctl(mq_id, IPC_RMID, NULL);
+    semctl(sem_id, 0, IPC_RMID);
+    exit(0);
+}
+```
+Jika server crash tanpa sempat cleanup, gunakan `make clear_ipc` untuk membersihkan resource IPC yang tersisa secara manual.
+ 
+**18. Semua akses shared memory dilindungi semaphore**
+Setiap fungsi handler (`handle_register`, `handle_login`, `handle_attack`, dll.) selalu memanggil `sem_lock()` di awal dan `sem_unlock()` sebelum return — termasuk di semua jalur error — untuk memastikan semaphore tidak pernah tertinggal dalam kondisi terkunci (deadlock).
 
 ### Full Code Setiap File Soal 2
 #### Makefile
