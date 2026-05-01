@@ -2426,7 +2426,7 @@ make clear_ipc
 **Alur penggunaan:**
 1. Pilih `Register` untuk membuat akun baru
 2. Login dengan akun yang sudah dibuat
-3. Di menu utama, pilih `Matchmaking` untuk mencari lawan
+3. Di menu utama, pilih `Battle` untuk mencari lawan
 4. Saat battle: tekan `a` untuk Attack, `u` untuk Ultimate
 5. Setelah battle, XP dan gold diberikan sebagai reward
 
