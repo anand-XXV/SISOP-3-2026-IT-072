@@ -12,7 +12,7 @@ Soal ini meminta implementasi sistem komunikasi berbasis **TCP socket** di C. Pe
 3. **Scalable server** – Server menangani banyak client sekaligus menggunakan `select()`, membedakan koneksi baru vs pesan masuk, dan menangani disconnect via `/exit` maupun interrupt signal.
 4. **Identitas unik** – Setiap client wajib memiliki nama unik; tidak boleh ada dua client dengan nama yang sama.
 5. **Broadcast** – Setiap pesan dari satu client diteruskan ke semua client lain yang aktif.
-6. **Admin RPC (The Knights)** – Akses eksklusif dengan autentikasi password untuk: cek jumlah user aktif, cek uptime server, dan emergency shutdown — tanpa melalui jalur broadcast.
+6. **Admin RPC (The Knights)** – Akses eksklusif dengan autentikasi password untuk: cek jumlah user aktif, cek uptime server, dan emergency shutdown, tanpa melalui jalur broadcast.
 7. **Logging** – Setiap pesan yang dibroadcast dicatat ke `history.log` dengan format `[YYYY-MM-DD HH:MM:SS] [System/Admin/User] [Status/Command/Chat]`.
 
 ### Proses Pengerjaan
@@ -855,7 +855,7 @@ if (mq_id < 0) {
     exit(1);
 }
 ```
-Perhatikan bahwa flag yang digunakan adalah `0666` tanpa `IPC_CREAT` — artinya client hanya bisa join ke IPC yang sudah ada, bukan membuat sendiri.
+Perhatikan bahwa flag yang digunakan adalah `0666` tanpa `IPC_CREAT`, artinya client hanya bisa join ke IPC yang sudah ada, bukan membuat sendiri.
  
 **2. Respons error dari server ditampilkan ke user**
 
@@ -892,7 +892,7 @@ if (my_hp < 0) my_hp = 0;
  
 **6. SIGINT (Ctrl+C) saat battle atau di menu**
 
-Signal handler `handle_exit()` dipasang di awal `main()`. Ketika Ctrl+C ditekan, handler akan: (a) kirim command `LOGOUT` ke server, (b) restore terminal mode, (c) keluar dengan bersih — memastikan status player di shared memory kembali ke OFFLINE.
+Signal handler `handle_exit()` dipasang di awal `main()`. Ketika Ctrl+C ditekan, handler akan: (a) kirim command `LOGOUT` ke server, (b) restore terminal mode, (c) keluar dengan bersih, memastikan status player di shared memory kembali ke OFFLINE.
  
 #### Server (`orion.c`)
  
@@ -2476,4 +2476,4 @@ make clear_ipc
 
 ### Kendala Soal 2
 
-Banyak sekali bug yang terjadi saat matchmakingnya, mulai dari sistem attacking dan ultimatenya, saving gold dan expnya, PVPnya, pembelian weapon, dan sistem history match. Matchmaking sangat sulit untuk diimplementasi mulai dari perlawanan dengan BOT yang saat pertama kalinya tidak bisa melakukan attack maupun ultimate, keduanya saat selesai match gold dan exp tidak terupdate dan tersave, kemudian saat sudah tersave tidak transfer memori gold saat itu ke dalam shop yang mengakibatkan gold static menjadi gold awal, terdapat bug saat mencoba PVP (terminal vs terminal) dimana 1 terminal tidak menampilkan hp masing-masing dan 1 terminal menampilkannya dengan normal, saat pvp juga misal saat 2 terminal berlawan dan match selesai (terminal 1 menang terminal 2 kalah) terminal 1 tetap stuck di dalam match sedangkan terminal 2 menampilkan screen defeat sesuai ekspektasi. Juga terdapat kendala saat pembuatan ASCII spesifik pada simbol backslash yang tidak terprint pada output.
+Banyak sekali bug yang terjadi saat matchmakingnya, mulai dari sistem attacking dan ultimatenya, saving gold dan expnya, PVPnya, pembelian weapon, dan sistem history match. Matchmaking sangat sulit untuk diimplementasi mulai dari perlawanan dengan BOT yang saat pertama kalinya tidak bisa melakukan attack maupun ultimate, keduanya saat selesai match gold dan exp tidak terupdate dan tersave, kemudian saat sudah tersave tidak transfer memori gold saat itu ke dalam shop yang mengakibatkan gold static menjadi gold awal, terdapat bug saat mencoba PVP (terminal vs terminal) dimana 1 terminal tidak menampilkan hp masing-masing dan 1 terminal menampilkannya dengan normal, saat pvp juga misal saat 2 terminal berlawan dan match selesai (terminal 1 menang terminal 2 kalah) terminal 1 tetap stuck di dalam match sedangkan terminal 2 menampilkan screen defeat sesuai ekspektasi. Juga terdapat kendala saat pembuatan ASCII spesifik pada simbol backslash yang tidak terprint pada output. Saat PvE (lawan bot) terkadang input attack/ultimate akan dilakukan 2 kali yang mengakibatkan double input tetapi bot tetap menyerang balik (mungkin ini visual bug saja sih)
