@@ -91,7 +91,7 @@ if (!added) {
 ```
  
 **2. Nama duplikat**
-Sebelum menyimpan nama client, server memanggil `name_taken()` yang mengiterasi seluruh slot. Jika nama sudah dipakai, server mengirim peringatan dan meminta nama lagi — tanpa memutus koneksi.
+Sebelum menyimpan nama client, server memanggil `name_taken()` yang mengiterasi seluruh slot. Jika nama sudah dipakai, server mengirim peringatan dan meminta nama lagi, tanpa memutus koneksi.
 ```
 if (name_taken(buf)) {
     char warn[BUF_SIZE];
@@ -809,7 +809,7 @@ Client menyediakan antarmuka TUI (Text User Interface) interaktif dengan beberap
 
 **`do_battle()`** – Layar battle utama dengan:
 - Menampilkan HP kedua pemain secara real-time (`draw_battle()`)
-- Input: `a` untuk Attack, `u` untuk Ultimate, `q` untuk menyerah
+- Input: `a` untuk Attack, `u` untuk Ultimate
 - Cooldown attack dan ultimate ditampilkan di layar
 - **`battle_recv_thread()`** berjalan paralel untuk menerima update dari server
 
@@ -851,7 +851,7 @@ Semua respons yang diawali `"ERR:"` ditangani secara seragam di sisi client. Err
     printf("  %s\n", buf + 4);
 }
 ```
-Contoh: jika username duplikat saat register → `ERR:Username already exists.` → ditampilkan sebagai `Username already exists.`
+Contoh: jika username duplikat saat register, `ERR:Username already exists.`,  ditampilkan sebagai `Username already exists.`
  
 **3. Pembelian senjata dengan weapon index tidak valid**
 Saat user memasukkan pilihan armory di luar range 1-5:
@@ -863,7 +863,7 @@ if (choice < 1 || choice > MAX_WEAPONS) {
 Validasi ini ada di sisi client sebagai defense pertama, sebelum command dikirim ke server.
  
 **4. Terminal mode restore setelah battle**
-Saat battle, terminal diubah ke raw mode (tanpa buffering, tanpa echo) agar input `a`/`u`/`q` bisa ditangkap langsung. Jika battle selesai atau program diinterrupt, `restore_mode()` dipanggil untuk mengembalikan terminal ke kondisi normal — mencegah terminal "rusak" setelah program selesai.
+Saat battle, terminal diubah ke raw mode (tanpa buffering, tanpa echo) agar input `a`/`u`/`q` bisa ditangkap langsung. Jika battle selesai atau program diinterrupt, `restore_mode()` dipanggil untuk mengembalikan terminal ke kondisi normal, mencegah terminal "rusak" setelah program selesai.
  
 **5. HP tidak bisa di bawah nol**
 Baik saat battle vs player maupun vs bot, HP diklem ke minimum 0:
