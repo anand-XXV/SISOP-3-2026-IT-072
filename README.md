@@ -941,7 +941,7 @@ if (strcmp(p->password, password) != 0) {
 }
 ```
  
-**11. Matchmaking tidak menemukan lawan → lawan bot**
+**11. Matchmaking tidak menemukan lawan maka lawan bot**
 
 Setelah `MATCHMAKING_TIME` (35 detik) tanpa menemukan player lain yang juga matchmaking, server mengatur status player ke `STATUS_BATTLE` dengan `opponent_idx = -1` (penanda bot) dan mengirim `MATCH:BOT` ke client.
 ```
@@ -1018,7 +1018,7 @@ Jika server crash tanpa sempat cleanup, gunakan `make clear_ipc` untuk membersih
  
 **18. Semua akses shared memory dilindungi semaphore**
 
-Setiap fungsi handler (`handle_register`, `handle_login`, `handle_attack`, dll.) selalu memanggil `sem_lock()` di awal dan `sem_unlock()` sebelum return — termasuk di semua jalur error — untuk memastikan semaphore tidak pernah tertinggal dalam kondisi terkunci (deadlock).
+Setiap fungsi handler (`handle_register`, `handle_login`, `handle_attack`, dll.) selalu memanggil `sem_lock()` di awal dan `sem_unlock()` sebelum return, termasuk di semua jalur error, untuk memastikan semaphore tidak pernah tertinggal dalam kondisi terkunci (deadlock).
 
 ### Full Code Setiap File Soal 2
 #### Makefile
@@ -2476,4 +2476,4 @@ make clear_ipc
 
 ### Kendala Soal 2
 
-Banyak sekali bug yang terjadi saat matchmakingnya, mulai dari sistem attacking dan ultimatenya, saving gold dan expnya, PVPnya, pembelian weapon, dan sistem history match. Matchmaking sangat sulit untuk diimplementasi mulai dari perlawanan dengan BOT yang saat pertama kalinya tidak bisa melakukan attack maupun ultimate, keduanya saat selesai match gold dan exp tidak terupdate dan tersave, kemudian saat sudah tersave tidak transfer memori gold saat itu ke dalam shop yang mengakibatkan gold static menjadi gold awal, terdapat bug saat mencoba PVP (terminal vs terminal) dimana 1 terminal tidak menampilkan hp masing-masing dan 1 terminal menampilkannya dengan normal, saat pvp juga misal saat 2 terminal berlawan dan match selesai (terminal 1 menang terminal 2 kalah) terminal 1 tetap stuck di dalam match sedangkan terminal 2 menampilkan screen defeat sesuai ekspektasi. Juga terdapat kendala saat pembuatan ASCII spesifik pada simbol '\' yang tidak terprint pada output.
+Banyak sekali bug yang terjadi saat matchmakingnya, mulai dari sistem attacking dan ultimatenya, saving gold dan expnya, PVPnya, pembelian weapon, dan sistem history match. Matchmaking sangat sulit untuk diimplementasi mulai dari perlawanan dengan BOT yang saat pertama kalinya tidak bisa melakukan attack maupun ultimate, keduanya saat selesai match gold dan exp tidak terupdate dan tersave, kemudian saat sudah tersave tidak transfer memori gold saat itu ke dalam shop yang mengakibatkan gold static menjadi gold awal, terdapat bug saat mencoba PVP (terminal vs terminal) dimana 1 terminal tidak menampilkan hp masing-masing dan 1 terminal menampilkannya dengan normal, saat pvp juga misal saat 2 terminal berlawan dan match selesai (terminal 1 menang terminal 2 kalah) terminal 1 tetap stuck di dalam match sedangkan terminal 2 menampilkan screen defeat sesuai ekspektasi. Juga terdapat kendala saat pembuatan ASCII spesifik pada simbol backslash yang tidak terprint pada output.
